@@ -1,0 +1,111 @@
+---
+title: "CodingNotesWrangling"
+author: "Jacobo"
+date: "2026-03-13"
+output: html_document
+---
+Loading tidyverse since I already have it installed
+```{r}
+library(tidyverse)
+
+```
+
+We read the .csv file, I modified the path to match my folders. We use str()to explore the object.
+```{r}
+microbiome.fungi <- read.csv("Bull_richness.csv")
+str(microbiome.fungi)
+```
+
+Here we use the select funtion to only work with certain columns. We use ":" when for specifying a desired range of columns we want to select in the order they already are.
+```{r}
+microbiome.fungi2 <- select(microbiome.fungi, SampleID, Crop, Compartment:Fungicide, richness)
+str(microbiome.fungi2)
+```
+
+Now we use filtefr() which is another way of subsetting
+```{r}
+head(filter(microbiome.fungi2, Treatment == "Conv."))
+```
+
+The good thing about filter is that we can use conditional to selects rows with certain values in different columns
+```{r}
+head(filter(microbiome.fungi2, Treatment == "Conv." & Fungicide == "C"))
+```
+
+and another example
+```{r}
+head(filter(microbiome.fungi2, Sample == "A" | Sample == "B")) # samples A or B
+```
+
+Now we are gonna use mutate() to create new columns
+```{r}
+microbiome.fungi2$logRich <- log(microbiome.fungi2$richness) 
+# Create a new column called logRich
+head(mutate(microbiome.fungi2, logRich = log(richness)))
+```
+
+And if we use paste we can create a new column that integrates the data in other two
+```{r}
+head(mutate(microbiome.fungi2, Crop_Treatment = paste(Crop, Treatment)))
+```
+
+
+In R the pipe sign is %>%, it used to use the output of a function directly as input of the next one. Here I directly add the selecting and group by part needed for calculating stats as well as creating the column for the results and plotting.
+```{r}
+plot1 <- microbiome.fungi %>%
+  select(SampleID, Crop, Compartment:Fungicide, richness) %>% # selecting columns
+  group_by(Treatment, Fungicide) %>% # grouping by treatment and fungicide to later calculate summary stats by group
+  mutate(logRich = log(richness)) %>% # creating a new column of the log richness
+  summarise(Mean.rich = mean(logRich), # calculating the mean richness, stdeviation, and standard error
+            n = n(), 
+            sd.dev = sd(logRich)) %>%
+  mutate(std.err = sd.dev/sqrt(n)) %>%
+  ggplot(aes(x = Fungicide, y = Mean.rich)) + # adding in a ggplot
+  geom_bar(stat="identity") +
+  geom_errorbar( aes(x=Fungicide, ymin=Mean.rich-std.err, ymax=Mean.rich+std.err), width=0.4) +
+  theme_minimal() +
+  xlab("") +
+  ylab("Log Richness") +
+  facet_wrap(~Treatment)
+```
+
+Now lets select sample Id and richness on one side and sample ID again and all of the other columns that are not richness and use left_join to add richness from the only column in common
+```{r}
+# selecting just the richness and sample ID
+richness <- microbiome.fungi %>%
+  select(SampleID, richness)
+
+# selecting columns that don't include the richness
+metadata <- microbiome.fungi %>% 
+  select(SampleID, Fungicide, Crop, Compartment, GrowthStage, Treatment, Rep, Sample)
+
+head(left_join(metadata, richness, by = "SampleID"))
+```
+
+Pivoting
+```{r}
+microbiome.fungi %>%
+  select(SampleID, Crop, Compartment:Fungicide, richness) %>% # selecting columns  filter(Class == "Sordariomycetes") %>%
+  group_by(Treatment, Fungicide) %>% # grouping by treatment and fungicide to later calculate summary stats by group
+  summarise(Mean = mean(richness)) %>% # calculates the mean per Treatment and Fungicide 
+  pivot_wider(names_from = Fungicide, values_from = Mean) %>% # pivot to wide format
+  mutate(diff.fungicide = C - F) # calculate the difference between the means. 
+```
+
+```{r}
+microbiome.fungi %>%
+  select(SampleID, Crop, Compartment:Fungicide, richness) %>% # selecting columns  filter(Class == "Sordariomycetes") %>%
+  group_by(Treatment, Fungicide) %>% # grouping by treatment and fungicide to later calculate summary stats by group
+  summarise(Mean = mean(richness)) %>% # calculates the mean per Treatment and Fungicide 
+  pivot_wider(names_from = Fungicide, values_from = Mean) %>% # pivot to wide format
+  mutate(diff.fungicide = C - F) %>%  # calculate the difference between the means. 
+  ggplot(aes(x = Treatment, y = diff.fungicide)) + # Plot it 
+  geom_col() +
+  theme_minimal() +
+  xlab("") +
+  ylab("Difference in average species richness")
+```
+
+
+
+

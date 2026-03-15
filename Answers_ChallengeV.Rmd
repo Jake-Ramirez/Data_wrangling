@@ -1,0 +1,89 @@
+---
+title: "ChallengeV_Answers"
+author: "Jacobo Dobon"
+date: "2026-03-05"
+output:
+  
+  md_document:
+    variant: gfm
+  html_document:
+    toc_float: true
+---
+
+## [Link](https://github.com/Jake-Ramirez/Data_wrangling)
+
+### 1. Download two .csv files from Canvas called DiversityData.csv and Metadata.csv, and read them into R using relative file paths.
+
+```{r}
+library(tidyverse)
+
+Diversity_Data <- read.csv("DiversityData.csv")
+Metadata <- read.csv("Metadata.csv")
+```
+
+
+### 2. Join the two dataframes together by the common column ‘Code’. Name the resulting dataframe alpha.
+
+```{r}
+alpha <- left_join(Diversity_Data, Metadata, by = "Code")
+head(alpha)
+```
+
+
+### 3. Calculate Pielou’s evenness index: Pielou’s evenness is an ecological parameter calculated by the Shannon diversity index (column Shannon) divided by the log of the richness column. 
+
+  a.	Using mutate, create a new column to calculate Pielou’s evenness index.
+  b.	Name the resulting dataframe alpha_even.
+```{r}
+alpha_even <- alpha %>%
+  group_by(shannon, richness) %>%
+  mutate(pielou = shannon/log(richness))
+head(alpha_even)
+```
+
+
+### 4. Using tidyverse language of functions and the pipe, use the summarise function and tell me the mean and standard error evenness grouped by crop over time.
+
+```{r}
+alpha_average <- alpha_even %>%
+  group_by(Crop, Time_Point) %>%
+  summarise(Mean.pielou = mean(pielou), # calculating the mean richness, count, stdeviation, and standard error
+            n = n(), 
+            sd.dev = sd(pielou)) %>%
+  mutate(std.err = sd.dev/sqrt(n))
+head(alpha_average)
+```
+
+
+### 5. Calculate the difference between the soybean column, the soil column, and the difference between the cotton column and the soil column
+
+```{r}
+alpha_average2 <- alpha_average %>%
+  select(Time_Point, Crop, Mean.pielou) %>%
+  pivot_wider(names_from = Crop, values_from = Mean.pielou) %>%
+  mutate(diff.cotton.pielou = Soil-Cotton, diff.soybean.pielou = Soil-Soybean)
+head(alpha_average2)
+```
+
+
+### 6. Connecting it to plots
+
+```{r}
+plot <- alpha_average2 %>%
+  select(Time_Point, diff.cotton.pielou, diff.soybean.pielou) %>%
+  pivot_longer(c(diff.cotton.pielou, diff.soybean.pielou), names_to = "diff") %>%
+  ggplot(aes(x=Time_Point, y=value, color = diff)) +
+  geom_line() +
+  theme_minimal() +
+  xlab("Time (hrs)") +
+  ylab("Difference from soil in Pielou's evenness")
+print(plot)
+
+```
+
+
+
+
+
+
+
